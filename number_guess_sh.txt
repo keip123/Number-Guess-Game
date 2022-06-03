@@ -1,0 +1,74 @@
+#!/bin/bash
+PSQL="psql --username=freecodecamp --dbname=postgres -t --no-align -c"
+
+NUMBER=$[ $RANDOM % 1000 + 1 ]
+echo "Enter your username:"
+read USERNAME
+#checks if username is in database
+USERNAME_DB=$($PSQL "SELECT username FROM users WHERE username='$USERNAME'")
+#if username doesn't exist
+if [[ -z $USERNAME_DB ]]
+then
+  echo "Welcome, $USERNAME! It looks like this is your first time here."
+  #enters new user into database
+  INSERT_USERNAME=$($PSQL "INSERT INTO users(username) VALUES('$USERNAME')")
+else
+  #get total number of games played
+  GAMES_PLAYED=$($PSQL "SELECT games_played FROM users WHERE username='$USERNAME'")
+  #get best game
+  BEST_GAME=$($PSQL "SELECT best_game FROM users WHERE username='$USERNAME'")
+  echo "Welcome back, $USERNAME! You have played $GAMES_PLAYED games, and your best game took $BEST_GAME guesses."
+fi
+GUESSING(){
+echo "Guess the secret number between 1 and 1000:"
+read GUESS
+#if new user has 0 games played
+if [[ -z $GAMES_PLAYED ]]
+then
+  INSERT_GAMES_PLAYED_NEW=$($PSQL "UPDATE users SET games_played = 1 WHERE username='$USERNAME'")
+else
+  #increment number of games played
+  INSERT_GAMES_PLAYED=$($PSQL "UPDATE users SET games_played = games_played + 1 WHERE username='$USERNAME'")
+fi
+COUNTER=1
+while [[ $GUESS != $NUMBER ]]
+do
+  #if guess is an integer
+  if [ "$GUESS" -gt 0 ] 2>/dev/null
+  then
+    #if guess is lower than randomly generated number
+    if [[ $GUESS -lt $NUMBER ]]
+    then
+      echo "It's higher than that, guess again:"
+      read GUESS
+      COUNTER=$[$COUNTER +1]
+    fi
+    #if guess is greater than randomly generated number
+    if [[ $GUESS -gt $NUMBER ]]
+    then
+      echo "It's lower than that, guess again:"
+      read GUESS
+      COUNTER=$[$COUNTER +1]
+    fi
+  else
+    echo "That is not an integer, guess again:"
+    read GUESS
+    COUNTER=$[$COUNTER +1]
+  fi
+done
+if [[ $GUESS = $NUMBER ]]
+then
+  echo "You guessed it in $COUNTER tries. The secret number was $NUMBER. Nice job!"
+  #if best_game is empty, insert new best game
+  if [[ -z $BEST_GAME ]]
+  then
+    INSERT_NEW_BEST_GAME_E=$($PSQL "UPDATE users SET best_game=$COUNTER WHERE username='$USERNAME'")
+  fi
+  #if current game is better than previous best game
+  if [[ $COUNTER -lt $BEST_GAME ]]
+  then
+    INSERT_NEW_BEST_GAME=$($PSQL "UPDATE users SET best_game=$COUNTER WHERE username='$USERNAME'")
+  fi
+fi
+}
+GUESSING
